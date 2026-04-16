@@ -6,12 +6,16 @@ from typing import Any, Dict, List
 import streamlit as st
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from utils.auth import ensure_authenticated, get_session_tokens  # noqa: E402
 from utils.supabase_client import get_log_by_date, upsert_log_fields  # noqa: E402
 
 st.set_page_config(
     page_title="Log Today — Army Log",
     layout="centered",
 )
+
+# ── Supabase Auth Gate ─────────────────────────────────────────────────────
+ensure_authenticated()
 
 # ── Styles (Future Tech Darkmode) ─────────────────────────────────────────────
 st.markdown(
@@ -78,7 +82,15 @@ def _init_session_state(today: datetime.date) -> None:
 
 
 def _load_log_into_state(log_date: datetime.date) -> None:
-    log = get_log_by_date(log_date) or {}
+    access_token, refresh_token = get_session_tokens()
+    log = (
+        get_log_by_date(
+            log_date,
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
+        or {}
+    )
     st.session_state["current_log"] = log
 
     st.session_state["prayer_status"] = log.get("prayer_status", "Completed")
@@ -102,7 +114,13 @@ def _load_log_into_state(log_date: datetime.date) -> None:
 def _save_fields(fields: Dict[str, Any]) -> None:
     log_date: datetime.date = st.session_state["log_date"]
     try:
-        upsert_log_fields(log_date, fields)
+        access_token, refresh_token = get_session_tokens()
+        upsert_log_fields(
+            log_date,
+            fields,
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
         st.session_state["last_saved_at"] = datetime.datetime.now()
     except Exception as exc:
         msg = str(exc)

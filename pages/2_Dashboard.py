@@ -7,12 +7,16 @@ import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from utils.auth import ensure_authenticated, get_session_tokens  # noqa: E402
 from utils.supabase_client import fetch_logs
 
 st.set_page_config(
     page_title="Dashboard — Army Log",
     layout="wide",
 )
+
+# ── Supabase Auth Gate ─────────────────────────────────────────────────────
+ensure_authenticated()
 
 # ── Styles ────────────────────────────────────────────────────────────────────
 st.markdown(
@@ -59,9 +63,11 @@ st.markdown(
 st.divider()
 
 # ── Data load ─────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=120)
 def load_data():
-    rows = fetch_logs(limit=90)
+    access_token, refresh_token = get_session_tokens()
+    rows = fetch_logs(
+        limit=90, access_token=access_token, refresh_token=refresh_token
+    )
     if not rows:
         return pd.DataFrame()
     df = pd.DataFrame(rows)
@@ -291,6 +297,5 @@ st.dataframe(
 # ── Refresh Button ────────────────────────────────────────────────────────────
 st.divider()
 if st.button("Refresh Data", use_container_width=False):
-    load_data.clear()
     st.rerun()
 

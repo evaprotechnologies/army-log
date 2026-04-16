@@ -4,6 +4,7 @@ A personal discipline tracking app built with **Streamlit** + **Supabase**. Inst
 
 ## Features
 - **Progressive autosave** — every field upserts to Supabase as you edit (no `st.form` submit step)
+- **Supabase Auth login** — you must sign in with a Supabase user account before using the app
 - **4 AM Prayer Block** — prayer status + `prayer_notes`
 - **Skill Focus** — autosaved on change
 - **Apollo Task Stack** — `tasks` stored as JSONB; add/tick tasks updates `apollo_backlog`
@@ -11,7 +12,7 @@ A personal discipline tracking app built with **Streamlit** + **Supabase**. Inst
 - **Dashboard updates** — includes last progressive save time + task completion stats
 
 ## Security Notice
-Do not commit `.env`. If it was ever pushed (even once), rotate your Supabase keys immediately—especially `SUPABASE_SERVICE_ROLE_KEY`.
+Do not commit `.env`. If it was ever pushed (even once), rotate your Supabase keys immediately (at least `SUPABASE_ANON_KEY` and any service keys).
 
 ## Tech Stack
 | Layer | Tool |
@@ -36,7 +37,7 @@ cp .env.example .env
 # → Open `.env` and paste:
 #   - `SUPABASE_URL`
 #   - `SUPABASE_ANON_KEY`
-#   - (optional) `SUPABASE_SERVICE_ROLE_KEY` if your Supabase RLS blocks writes
+#   - Ensure your Supabase RLS allows `SELECT/INSERT/UPDATE` for the logged-in user.
 
 # 4. Run
 streamlit run app.py
@@ -50,8 +51,6 @@ streamlit run app.py
    ```toml
    SUPABASE_URL = "https://your-project-ref.supabase.co"
    SUPABASE_ANON_KEY = "your-anon-key"
-   # Optional: bypass RLS for server-side writes (keep secret!)
-   SUPABASE_SERVICE_ROLE_KEY = "your-service-role-key"
    ```
 4. Deploy
 
@@ -102,5 +101,4 @@ ALTER TABLE daily_logs
 
 ## Notes on RLS (autosave permissions)
 
-- If your Supabase `daily_logs` RLS policies block writes, autosave will fail.
-- Fix either by updating RLS policies for `daily_logs` (preferred), or by setting `SUPABASE_SERVICE_ROLE_KEY` (server-side only; keep it secret).
+- Autosave and reads now run as the logged-in Supabase user (using their JWT), so `daily_logs` must allow `SELECT`, `INSERT`, and `UPDATE` for whatever RLS policies you enable.
