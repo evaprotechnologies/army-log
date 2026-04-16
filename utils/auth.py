@@ -24,7 +24,12 @@ def login(email: str, password: str) -> Tuple[bool, Optional[str]]:
     """Signs the user in via Supabase Auth (email/password)."""
     client = _auth_client()
 
-    res = client.auth.sign_in_with_password({"email": email, "password": password})
+    try:
+        res = client.auth.sign_in_with_password(
+            {"email": email, "password": password}
+        )
+    except Exception as exc:  # Supabase Auth errors (invalid creds, unconfirmed email, etc.)
+        return False, str(exc)
     # supabase-py may return either a response object or dict-like response.
     session = getattr(res, "session", None) or (res.get("session") if hasattr(res, "get") else None)
     user = getattr(res, "user", None) or (res.get("user") if hasattr(res, "get") else None)
