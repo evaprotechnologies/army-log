@@ -83,8 +83,11 @@ prayer_rate = (
     (df["prayer_status"] == "Completed").sum() / total_logs * 100
     if total_logs else 0
 )
+bible_rate = (
+    (df["bible_completed"] == True).sum() / total_logs * 100
+    if total_logs and "bible_completed" in df.columns else 0
+)
 avg_energy = df["energy_level"].mean() if "energy_level" in df.columns else 0
-avg_backlog = df["apollo_backlog"].mean() if "apollo_backlog" in df.columns else 0
 
 c1, c2, c3, c4 = st.columns(4)
 
@@ -99,10 +102,10 @@ def kpi(col, value, label):
         unsafe_allow_html=True,
     )
 
-kpi(c1, total_logs, "Total Logs")
-kpi(c2, f"{prayer_rate:.0f}%", "Prayer Rate")
+kpi(c1, f"{prayer_rate:.0f}%", "Prayer Rate")
+kpi(c2, f"{bible_rate:.0f}%", "Bible Plan Rate")
 kpi(c3, f"{avg_energy:.1f}/10", "Avg Energy")
-kpi(c4, f"{avg_backlog:.0f}", "Avg Backlog")
+kpi(c4, total_logs, "Total Logs")
 
 st.divider()
 
@@ -129,22 +132,29 @@ with col_left:
     st.plotly_chart(fig_energy, use_container_width=True)
 
 with col_right:
-    st.markdown("#### Apollo Backlog Over Time")
-    fig_backlog = px.bar(
-        df,
-        x="log_date",
-        y="apollo_backlog",
-        color_discrete_sequence=["#00D4FF"],
-        template="plotly_dark",
-    )
-    fig_backlog.update_layout(
-        paper_bgcolor="#0A0A0F",
-        plot_bgcolor="#0A0A0F",
-        yaxis=dict(gridcolor="#1e1e2e"),
-        xaxis=dict(gridcolor="#1e1e2e"),
-        margin=dict(l=0, r=0, t=10, b=0),
-    )
-    st.plotly_chart(fig_backlog, use_container_width=True)
+    st.markdown("#### Bible Reading Consistency")
+    if "bible_completed" in df.columns:
+        # Create a consistency bar chart (1 for met, 0 for not)
+        df["bible_numeric"] = df["bible_completed"].astype(int)
+        fig_bible = px.bar(
+            df,
+            x="log_date",
+            y="bible_numeric",
+            color="bible_completed",
+            color_discrete_map={True: "#00FF94", False: "#FF4B4B"},
+            template="plotly_dark",
+        )
+        fig_bible.update_layout(
+            paper_bgcolor="#0A0A0F",
+            plot_bgcolor="#0A0A0F",
+            showlegend=False,
+            yaxis=dict(tickvals=[0, 1], ticktext=["Missed", "Met"], gridcolor="#1e1e2e"),
+            xaxis=dict(gridcolor="#1e1e2e"),
+            margin=dict(l=0, r=0, t=10, b=0),
+        )
+        st.plotly_chart(fig_bible, use_container_width=True)
+    else:
+        st.info("No Bible reading data available yet.")
 
 # ── Charts Row 2 ──────────────────────────────────────────────────────────────
 col_a, col_b = st.columns([1, 2])
@@ -170,25 +180,22 @@ with col_a:
     st.plotly_chart(fig_prayer, use_container_width=True)
 
 with col_b:
-    st.markdown("#### Energy vs. Backlog Correlation")
-    fig_scatter = px.scatter(
+    st.markdown("#### Apollo Backlog Over Time")
+    fig_backlog = px.bar(
         df,
-        x="apollo_backlog",
-        y="energy_level",
-        color="prayer_status",
-        color_discrete_map={"Completed": "#00FF94", "Missed": "#FF4B4B"},
+        x="log_date",
+        y="apollo_backlog",
+        color_discrete_sequence=["#00D4FF"],
         template="plotly_dark",
-        hover_data=["log_date", "daily_win"],
-        trendline="ols",
     )
-    fig_scatter.update_layout(
+    fig_backlog.update_layout(
         paper_bgcolor="#0A0A0F",
         plot_bgcolor="#0A0A0F",
-        yaxis=dict(range=[0, 11], gridcolor="#1e1e2e"),
+        yaxis=dict(gridcolor="#1e1e2e"),
         xaxis=dict(gridcolor="#1e1e2e"),
         margin=dict(l=0, r=0, t=10, b=0),
     )
-    st.plotly_chart(fig_scatter, use_container_width=True)
+    st.plotly_chart(fig_backlog, use_container_width=True)
 
 st.divider()
 
@@ -202,11 +209,11 @@ display_df["log_date"] = display_df["log_date"].dt.strftime("%a, %d %b %Y")
 column_map = {
     "log_date": "Date",
     "prayer_status": "Prayer",
+    "bible_reading": "Reading",
     "skill_focus": "Skill Focus",
     "apollo_backlog": "Backlog",
     "energy_level": "Energy",
     "daily_win": "Daily Win",
-    "evapro_progress": "Evapro Progress",
 }
 
 display_cols = [c for c in column_map if c in display_df.columns]
@@ -231,3 +238,4 @@ st.divider()
 if st.button("Refresh Data", use_container_width=False):
     load_data.clear()
     st.rerun()
+

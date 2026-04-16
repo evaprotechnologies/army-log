@@ -1,10 +1,65 @@
 import streamlit as st
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 st.set_page_config(
     page_title="Army Log — Daily Ops",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ── Security Layer ────────────────────────────────────────────────────────────
+def check_password():
+    """Returns True if the user had the correct password."""
+
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        # 1. Try Streamlit Secrets
+        try:
+            target_password = st.secrets.get("APP_PASSWORD")
+        except Exception:
+            target_password = None
+
+        # 2. Fallback to Environment Variable or Default
+        if not target_password:
+            target_password = os.environ.get("APP_PASSWORD", "army-log-default")
+
+        if st.session_state["password"] == target_password:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # don't store password
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # First run, show input for password.
+        st.markdown(
+            """
+            <div style='text-align:center; padding: 2rem;'>
+                <h1 style='color:#00FF94; letter-spacing:3px;'>SECURE ACCESS REQUIRED</h1>
+                <p style='color:#666;'>Enter your Command Entry Password to proceed.</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        st.text_input(
+            "Command Password", type="password", on_change=password_entered, key="password"
+        )
+        return False
+    elif not st.session_state["password_correct"]:
+        # Password incorrect, show input + error.
+        st.text_input(
+            "Command Password", type="password", on_change=password_entered, key="password"
+        )
+        st.error("❌ Access Denied: Invalid Credentials")
+        return False
+    else:
+        # Password correct.
+        return True
+
+if not check_password():
+    st.stop()
 
 # ── Sidebar brand ────────────────────────────────────────────────────────────
 st.sidebar.markdown(
@@ -96,3 +151,4 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+

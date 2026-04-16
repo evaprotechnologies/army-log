@@ -3,8 +3,8 @@
 A personal discipline tracking app built with **Streamlit** + **Supabase**. Logs your 9 PM daily debrief and visualises trends over time.
 
 ## Features
-- **Log Today** — Daily form covering prayer status, skill focus, Apollo backlog, Evapro progress, energy level, and daily win
-- **Dashboard** — Energy trends, backlog charts, prayer streak donut, and a correlation scatter with trendline
+- **Log Today** — Daily form covering prayer status, Bible reading plans, skill focus, Apollo backlog, energy level, and daily win
+- **Dashboard** — Energy trends, Bible consistency, prayer streaks, and backlog charts
 - **Duplicate guard** — Prevents logging the same date twice
 - **Manual log date** — Backfill missed days accurately
 
@@ -53,6 +53,8 @@ streamlit run app.py
 | `created_at` | TIMESTAMPTZ | Auto-set insert timestamp |
 | `log_date` | DATE | The day being reported (manual) |
 | `prayer_status` | TEXT | "Completed" / "Missed" |
+| `bible_reading` | TEXT | Chapters read (e.g. "Genesis 1-3") |
+| `bible_completed` | BOOLEAN | Met the day's plan target |
 | `skill_focus` | TEXT | Morning study topic |
 | `apollo_backlog` | INTEGER | Tasks remaining |
 | `evapro_progress` | TEXT | Features built |

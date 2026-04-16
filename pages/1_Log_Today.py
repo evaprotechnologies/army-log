@@ -225,6 +225,25 @@ with st.form("daily_log_form", clear_on_submit=True):
 
     st.divider()
 
+    # --- Bible Reading block ---
+    st.markdown('<div class="section-label">📖 Bible Reading</div>', unsafe_allow_html=True)
+    col_a, col_b = st.columns([2, 1])
+    with col_a:
+        bible_reading = st.text_input(
+            "Current Chapters / Progress",
+            placeholder="e.g. Genesis 1-5, Psalm 23",
+            help="Which chapters did you read today?",
+        )
+    with col_b:
+        st.write("") # Shim for alignment
+        bible_completed = st.checkbox(
+            "Plan Target Met?",
+            value=False,
+            help="Did you complete your assigned reading for today?",
+        )
+
+    st.divider()
+
     submitted = st.form_submit_button(
         "Transmit Report",
         use_container_width=True,
@@ -260,6 +279,8 @@ if submitted:
             "evapro_progress": evapro_progress.strip(),
             "energy_level": int(energy_level),
             "daily_win": daily_win.strip(),
+            "bible_reading": bible_reading.strip(),
+            "bible_completed": bool(bible_completed),
         }
 
         try:
