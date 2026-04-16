@@ -66,6 +66,26 @@ def load_data():
         return pd.DataFrame()
     df = pd.DataFrame(rows)
     df["log_date"] = pd.to_datetime(df["log_date"])
+
+    if "last_updated_at" in df.columns:
+        df["last_updated_at"] = pd.to_datetime(df["last_updated_at"], errors="coerce")
+
+    # Derive task-level stats from JSONB `tasks` if present
+    if "tasks" in df.columns:
+        def _task_counts(tasks):
+            try:
+                if not isinstance(tasks, list):
+                    return 0, 0
+                total = len(tasks)
+                done = sum(1 for t in tasks if t.get("done"))
+                return total, done
+            except Exception:
+                return 0, 0
+
+        totals, dones = zip(*df["tasks"].map(_task_counts)) if len(df) else ([], [])
+        df["tasks_total"] = totals if len(df) else 0
+        df["tasks_done"] = dones if len(df) else 0
+
     df = df.sort_values("log_date")
     return df
 
@@ -81,15 +101,29 @@ if df.empty:
 total_logs = len(df)
 prayer_rate = (
     (df["prayer_status"] == "Completed").sum() / total_logs * 100
-    if total_logs else 0
+    if total_logs and "prayer_status" in df.columns else 0
 )
 bible_rate = (
-    (df["bible_completed"] == True).sum() / total_logs * 100
+    (df["bible_completed"] == True).sum() / total_logs * 100  # noqa: E712
     if total_logs and "bible_completed" in df.columns else 0
 )
 avg_energy = df["energy_level"].mean() if "energy_level" in df.columns else 0
 
+avg_backlog = df["apollo_backlog"].mean() if "apollo_backlog" in df.columns else 0
+
+task_completion = 0
+if "tasks_total" in df.columns and "tasks_done" in df.columns:
+    total_tasks = df["tasks_total"].sum()
+    done_tasks = df["tasks_done"].sum()
+    task_completion = (done_tasks / total_tasks * 100) if total_tasks else 0
+
+last_updated_str = "N/A"
+if "last_updated_at" in df.columns and df["last_updated_at"].notna().any():
+    last_ts = df["last_updated_at"].max()
+    last_updated_str = last_ts.strftime("%d %b %Y · %H:%M") if not pd.isna(last_ts) else "N/A"
+
 c1, c2, c3, c4 = st.columns(4)
+
 
 def kpi(col, value, label):
     col.markdown(
@@ -102,10 +136,13 @@ def kpi(col, value, label):
         unsafe_allow_html=True,
     )
 
+
 kpi(c1, f"{prayer_rate:.0f}%", "Prayer Rate")
 kpi(c2, f"{bible_rate:.0f}%", "Bible Plan Rate")
 kpi(c3, f"{avg_energy:.1f}/10", "Avg Energy")
-kpi(c4, total_logs, "Total Logs")
+kpi(c4, f"{task_completion:.0f}%", "Tasks Done")
+
+st.caption(f"Last progressive update: {last_updated_str} · Avg backlog: {avg_backlog:.1f} tasks")
 
 st.divider()
 
@@ -180,7 +217,7 @@ with col_a:
     st.plotly_chart(fig_prayer, use_container_width=True)
 
 with col_b:
-    st.markdown("#### Apollo Backlog Over Time")
+    st.markdown("#### Apollo Backlog & Tasks")
     fig_backlog = px.bar(
         df,
         x="log_date",
@@ -188,6 +225,16 @@ with col_b:
         color_discrete_sequence=["#00D4FF"],
         template="plotly_dark",
     )
+    if "tasks_done" in df.columns:
+        fig_backlog.add_trace(
+            go.Scatter(
+                x=df["log_date"],
+                y=df["tasks_done"],
+                mode="lines+markers",
+                name="Tasks Done",
+                line=dict(color="#00FF94", width=2),
+            )
+        )
     fig_backlog.update_layout(
         paper_bgcolor="#0A0A0F",
         plot_bgcolor="#0A0A0F",
@@ -205,6 +252,11 @@ st.markdown("#### Full Log History")
 display_df = df.copy()
 display_df["log_date"] = display_df["log_date"].dt.strftime("%a, %d %b %Y")
 
+if "last_updated_at" in display_df.columns:
+    display_df["last_updated_at"] = display_df["last_updated_at"].dt.strftime(
+        "%d %b %Y %H:%M"
+    )
+
 # Reorder and rename columns for display
 column_map = {
     "log_date": "Date",
@@ -212,8 +264,10 @@ column_map = {
     "bible_reading": "Reading",
     "skill_focus": "Skill Focus",
     "apollo_backlog": "Backlog",
+    "tasks_done": "Tasks Done",
     "energy_level": "Energy",
     "daily_win": "Daily Win",
+    "last_updated_at": "Last Updated",
 }
 
 display_cols = [c for c in column_map if c in display_df.columns]
@@ -230,6 +284,7 @@ st.dataframe(
             min_value=0, max_value=10, format="%d/10"
         ),
         "Backlog": st.column_config.NumberColumn(format="%d tasks"),
+        "Tasks Done": st.column_config.NumberColumn(format="%d"),
     },
 )
 
