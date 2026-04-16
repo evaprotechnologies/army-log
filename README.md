@@ -1,12 +1,17 @@
-# Army Log — Daily Ops Tracker
+# Army Log — Living Command Center
 
-A personal discipline tracking app built with **Streamlit** + **Supabase**. Logs your 9 PM daily debrief and visualises trends over time.
+A personal discipline tracking app built with **Streamlit** + **Supabase**. Instead of a single end-of-day submission, it progressively saves your inputs through the day and visualises trends over time.
 
 ## Features
-- **Log Today** — Daily form covering prayer status, Bible reading plans, skill focus, Apollo backlog, energy level, and daily win
-- **Dashboard** — Energy trends, Bible consistency, prayer streaks, and backlog charts
-- **Duplicate guard** — Prevents logging the same date twice
-- **Manual log date** — Backfill missed days accurately
+- **Progressive autosave** — every field upserts to Supabase as you edit (no `st.form` submit step)
+- **4 AM Prayer Block** — prayer status + `prayer_notes`
+- **Skill Focus** — autosaved on change
+- **Apollo Task Stack** — `tasks` stored as JSONB; add/tick tasks updates `apollo_backlog`
+- **Evapro Progress + Energy + Daily Win** — autosaved on change
+- **Dashboard updates** — includes last progressive save time + task completion stats
+
+## Security Notice
+Do not commit `.env`. If it was ever pushed (even once), rotate your Supabase keys immediately—especially `SUPABASE_SERVICE_ROLE_KEY`.
 
 ## Tech Stack
 | Layer | Tool |
@@ -28,7 +33,10 @@ pip install -r requirements.txt
 
 # 3. Add your secrets
 cp .env.example .env
-# → Open .env and paste your SUPABASE_URL and SUPABASE_ANON_KEY
+# → Open `.env` and paste:
+#   - `SUPABASE_URL`
+#   - `SUPABASE_ANON_KEY`
+#   - (optional) `SUPABASE_SERVICE_ROLE_KEY` if your Supabase RLS blocks writes
 
 # 4. Run
 streamlit run app.py
@@ -42,6 +50,8 @@ streamlit run app.py
    ```toml
    SUPABASE_URL = "https://your-project-ref.supabase.co"
    SUPABASE_ANON_KEY = "your-anon-key"
+   # Optional: bypass RLS for server-side writes (keep secret!)
+   SUPABASE_SERVICE_ROLE_KEY = "your-service-role-key"
    ```
 4. Deploy
 
@@ -51,12 +61,46 @@ streamlit run app.py
 |---|---|---|
 | `id` | UUID | Primary key |
 | `created_at` | TIMESTAMPTZ | Auto-set insert timestamp |
-| `log_date` | DATE | The day being reported (manual) |
+| `log_date` | DATE | The day being reported (one row per day) |
 | `prayer_status` | TEXT | "Completed" / "Missed" |
+| `prayer_notes` | TEXT | Notes for the 4:30 AM block |
 | `bible_reading` | TEXT | Chapters read (e.g. "Genesis 1-3") |
 | `bible_completed` | BOOLEAN | Met the day's plan target |
 | `skill_focus` | TEXT | Morning study topic |
-| `apollo_backlog` | INTEGER | Tasks remaining |
+| `apollo_backlog` | INTEGER | Tasks remaining (derived from `tasks` length) |
+| `tasks` | JSONB | Apollo tasks array (e.g. `[{"id":1,"text":"...","done":false}]`) |
 | `evapro_progress` | TEXT | Features built |
 | `energy_level` | INTEGER | 1–10 self-rating |
 | `daily_win` | TEXT | Primary victory |
+| `last_updated_at` | TIMESTAMPTZ | Timestamp of the latest progressive autosave (UTC default) |
+
+## Database Migration (Supabase SQL Editor)
+
+Run this once to support progressive logging (unique per-day row + new columns).
+
+```sql
+-- 1) Enforce 1 log row per day (required for upsert on log_date)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE table_name='daily_logs'
+      AND constraint_type='UNIQUE'
+      AND constraint_name='unique_log_date'
+  ) THEN
+    ALTER TABLE daily_logs ADD CONSTRAINT unique_log_date UNIQUE (log_date);
+  END IF;
+END $$;
+
+-- 2) Progressive fields
+ALTER TABLE daily_logs
+  ADD COLUMN IF NOT EXISTS prayer_notes TEXT,
+  ADD COLUMN IF NOT EXISTS tasks JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS last_updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now());
+```
+
+## Notes on RLS (autosave permissions)
+
+- If your Supabase `daily_logs` RLS policies block writes, autosave will fail.
+- Fix either by updating RLS policies for `daily_logs` (preferred), or by setting `SUPABASE_SERVICE_ROLE_KEY` (server-side only; keep it secret).
