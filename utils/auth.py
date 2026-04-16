@@ -28,7 +28,9 @@ def login(email: str, password: str) -> Tuple[bool, Optional[str]]:
         res = client.auth.sign_in_with_password(
             {"email": email, "password": password}
         )
-    except Exception as exc:  # Supabase Auth errors (invalid creds, unconfirmed email, etc.)
+    except BaseException as exc:  # Supabase Auth errors (invalid creds, unconfirmed email, etc.)
+        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+            raise
         return False, str(exc)
     # supabase-py may return either a response object or dict-like response.
     session = getattr(res, "session", None) or (res.get("session") if hasattr(res, "get") else None)
@@ -107,7 +109,11 @@ def ensure_authenticated() -> None:
             if not email.strip() or not password:
                 st.error("Email and password are required.")
             else:
-                ok, err = login(email.strip(), password)
+                try:
+                    ok, err = login(email.strip(), password)
+                except BaseException as exc:
+                    st.error(f"Login failed: {exc}")
+                    st.stop()
                 if ok:
                     st.success("Signed in.")
                     st.rerun()
