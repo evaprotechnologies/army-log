@@ -26,7 +26,7 @@ def check_password():
         if not target_password:
             target_password = os.environ.get("APP_PASSWORD", "army-log-default")
 
-        if st.session_state["password"] == target_password:
+        if st.session_state["password"] == str(target_password):
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # don't store password
         else:
