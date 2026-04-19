@@ -28,9 +28,7 @@ def login(email: str, password: str) -> Tuple[bool, Optional[str]]:
         res = client.auth.sign_in_with_password(
             {"email": email, "password": password}
         )
-    except BaseException as exc:  # Supabase Auth errors (invalid creds, unconfirmed email, etc.)
-        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
-            raise
+    except Exception as exc:  # Supabase Auth errors (invalid creds, unconfirmed email, etc.)
         return False, str(exc)
     # supabase-py may return either a response object or dict-like response.
     session = getattr(res, "session", None) or (res.get("session") if hasattr(res, "get") else None)
@@ -99,6 +97,11 @@ def ensure_authenticated() -> None:
         unsafe_allow_html=True,
     )
 
+    st.caption(
+        "Accounts are not created from this app. Ask an admin to add your user in "
+        "Supabase **Authentication → Users**, then sign in here."
+    )
+
     with st.form("supabase_login_form", clear_on_submit=False):
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
@@ -111,7 +114,7 @@ def ensure_authenticated() -> None:
             else:
                 try:
                     ok, err = login(email.strip(), password)
-                except BaseException as exc:
+                except Exception as exc:
                     st.error(f"Login failed: {exc}")
                     st.stop()
                 if ok:

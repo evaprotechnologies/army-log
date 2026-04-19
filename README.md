@@ -4,7 +4,7 @@ A personal discipline tracking app built with **Streamlit** + **Supabase**. Inst
 
 ## Features
 - **Progressive autosave** — every field upserts to Supabase as you edit (no `st.form` submit step)
-- **Supabase Auth login** — you must sign in with a Supabase user account before using the app
+- **Supabase Auth login** — sign in with a **pre-provisioned** Supabase user (the app does not offer public sign-up)
 - **4 AM Prayer Block** — prayer status + `prayer_notes`
 - **Skill Focus** — autosaved on change
 - **Apollo Task Stack** — `tasks` stored as JSONB; add/tick tasks updates `apollo_backlog`
@@ -13,6 +13,8 @@ A personal discipline tracking app built with **Streamlit** + **Supabase**. Inst
 
 ## Security Notice
 Do not commit `.env`. If it was ever pushed (even once), rotate your Supabase keys immediately (at least `SUPABASE_ANON_KEY` and any service keys).
+
+For account creation, use **Supabase Dashboard → Authentication → Users** (admin-provisioned users only). In Supabase, also disable **public email sign-ups** so accounts cannot be created outside your controlled flow.
 
 ## Tech Stack
 | Layer | Tool |

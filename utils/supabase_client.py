@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
+from supabase.lib.client_options import SyncClientOptions
 
 load_dotenv()
 
@@ -22,23 +23,24 @@ def get_client(
 ) -> Client:
     """Create a Supabase client using the anon key.
 
-    If `access_token` + `refresh_token` are provided, the client is bound to that user session
-    (so RLS policies can evaluate as that user).
+    If `access_token` is provided, PostgREST requests include `Authorization: Bearer <jwt>`
+    so RLS policies evaluate as that user.
+
+    Note: we intentionally avoid `client.auth.set_session(...)` here because it performs an
+    extra Auth HTTP round-trip (`GET /user`) that can time out on flaky networks.
     """
     url = _require_env("SUPABASE_URL")
     anon_key = _require_env("SUPABASE_ANON_KEY")
 
-    client = create_client(url, anon_key)
-
     if access_token:
-        if not refresh_token:
-            raise EnvironmentError(
-                "refresh_token is required when access_token is provided."
-            )
-        # Attach JWT to the client so table operations are performed as the logged-in user.
-        client.auth.set_session(access_token, refresh_token)
+        options = SyncClientOptions(
+            headers={"Authorization": f"Bearer {access_token}"},
+            postgrest_client_timeout=120,
+        )
+    else:
+        options = SyncClientOptions(postgrest_client_timeout=120)
 
-    return client
+    return create_client(url, anon_key, options)
 
 
 def insert_log(
